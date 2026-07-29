@@ -22,6 +22,7 @@ export function PropertiesPanel() {
       <div className="panel">
         <h3>{t("propertiesTitle")}</h3>
         <p className="hint">{t("selectHint")}</p>
+        <p className="hint">{t("shortcutsHint")}</p>
       </div>
     );
   }

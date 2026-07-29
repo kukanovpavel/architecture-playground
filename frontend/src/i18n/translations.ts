@@ -68,6 +68,13 @@ export const UI = {
     themeSwitchTitle: "Switch theme",
     themeLight: "Light",
     themeDark: "Dark",
+
+    undo: "Undo",
+    redo: "Redo",
+    undoTitle: "Undo (Ctrl/Cmd+Z)",
+    redoTitle: "Redo (Ctrl/Cmd+Shift+Z)",
+    shortcutsHint:
+      "Shortcuts: Delete/Backspace — delete, Ctrl/Cmd+C/X/V — copy/cut/paste, Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo.",
   },
   ru: {
     appTitle: "Конструктор архитектур",
@@ -139,6 +146,13 @@ export const UI = {
     themeSwitchTitle: "Сменить тему",
     themeLight: "Светлая",
     themeDark: "Тёмная",
+
+    undo: "Отменить",
+    redo: "Повторить",
+    undoTitle: "Отменить (Ctrl/Cmd+Z)",
+    redoTitle: "Повторить (Ctrl/Cmd+Shift+Z)",
+    shortcutsHint:
+      "Горячие клавиши: Delete/Backspace — удалить, Ctrl/Cmd+C/X/V — копировать/вырезать/вставить, Ctrl/Cmd+Z — отменить, Ctrl/Cmd+Shift+Z — повторить.",
   },
 } as const;
 

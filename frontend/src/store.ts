@@ -23,6 +23,14 @@ function uid(): string {
   return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 }
 
+interface HistorySnapshot {
+  components: ComponentNode[];
+  connections: Connection[];
+  requirements: Requirement[];
+}
+
+const MAX_HISTORY = 50;
+
 interface EditorState {
   catalog: Catalog | null;
   projectId: string | null;
@@ -38,12 +46,16 @@ interface EditorState {
   simulating: boolean;
   dirty: boolean;
 
+  clipboard: ComponentNode | null;
+  past: HistorySnapshot[];
+  future: HistorySnapshot[];
+
   loadCatalog: () => Promise<void>;
   openProject: (id: string) => Promise<void>;
   reset: () => void;
 
   addComponent: (type: string, x: number, y: number) => void;
-  updateComponentPosition: (id: string, x: number, y: number) => void;
+  updateComponentPosition: (id: string, x: number, y: number, commit?: boolean) => void;
   updateComponent: (id: string, patch: Partial<ComponentNode>) => void;
   removeComponent: (id: string) => void;
 
@@ -57,8 +69,32 @@ interface EditorState {
   select: (componentId: string | null, connectionId: string | null) => void;
   setHighlighted: (ids: string[]) => void;
 
+  deleteSelected: () => void;
+  copySelected: () => void;
+  cutSelected: () => void;
+  pasteClipboard: () => void;
+  undo: () => void;
+  redo: () => void;
+
   save: () => Promise<void>;
   runSimulation: () => Promise<void>;
+}
+
+function snapshot(s: Pick<EditorState, "components" | "connections" | "requirements">): HistorySnapshot {
+  return {
+    components: s.components,
+    connections: s.connections,
+    requirements: s.requirements,
+  };
+}
+
+// Merge this into a `set()` call from any mutating action to push the
+// pre-mutation state onto the undo stack and clear the redo stack.
+function pushUndo(s: EditorState): Pick<EditorState, "past" | "future"> {
+  return {
+    past: [...s.past, snapshot(s)].slice(-MAX_HISTORY),
+    future: [],
+  };
 }
 
 export const useStore = create<EditorState>((set, get) => ({
@@ -75,6 +111,10 @@ export const useStore = create<EditorState>((set, get) => ({
   saving: false,
   simulating: false,
   dirty: false,
+
+  clipboard: null,
+  past: [],
+  future: [],
 
   loadCatalog: async () => {
     if (get().catalog) return;
@@ -95,6 +135,9 @@ export const useStore = create<EditorState>((set, get) => ({
       findings: [],
       highlightedIds: new Set(),
       dirty: false,
+      clipboard: null,
+      past: [],
+      future: [],
     });
   },
 
@@ -110,17 +153,21 @@ export const useStore = create<EditorState>((set, get) => ({
       findings: [],
       highlightedIds: new Set(),
       dirty: false,
+      clipboard: null,
+      past: [],
+      future: [],
     }),
 
   addComponent: (type, x, y) => {
     const catalog = get().catalog;
     const label = catalog?.types[type]?.label ?? type;
     const comp: ComponentNode = { id: uid(), type, name: label, x, y, props: {} };
-    set((s) => ({ components: [...s.components, comp], dirty: true }));
+    set((s) => ({ ...pushUndo(s), components: [...s.components, comp], dirty: true }));
   },
 
-  updateComponentPosition: (id, x, y) => {
+  updateComponentPosition: (id, x, y, commit = true) => {
     set((s) => ({
+      ...(commit ? pushUndo(s) : null),
       components: s.components.map((c) => (c.id === id ? { ...c, x, y } : c)),
       dirty: true,
     }));
@@ -128,6 +175,7 @@ export const useStore = create<EditorState>((set, get) => ({
 
   updateComponent: (id, patch) => {
     set((s) => ({
+      ...pushUndo(s),
       components: s.components.map((c) => (c.id === id ? { ...c, ...patch } : c)),
       dirty: true,
     }));
@@ -135,6 +183,7 @@ export const useStore = create<EditorState>((set, get) => ({
 
   removeComponent: (id) => {
     set((s) => ({
+      ...pushUndo(s),
       components: s.components.filter((c) => c.id !== id),
       connections: s.connections.filter(
         (c) => c.source_id !== id && c.target_id !== id
@@ -152,11 +201,12 @@ export const useStore = create<EditorState>((set, get) => ({
       protocol: "sync_http",
       label: "",
     };
-    set((s) => ({ connections: [...s.connections, conn], dirty: true }));
+    set((s) => ({ ...pushUndo(s), connections: [...s.connections, conn], dirty: true }));
   },
 
   updateConnection: (id, patch) => {
     set((s) => ({
+      ...pushUndo(s),
       connections: s.connections.map((c) => (c.id === id ? { ...c, ...patch } : c)),
       dirty: true,
     }));
@@ -164,6 +214,7 @@ export const useStore = create<EditorState>((set, get) => ({
 
   removeConnection: (id) => {
     set((s) => ({
+      ...pushUndo(s),
       connections: s.connections.filter((c) => c.id !== id),
       selectedConnectionId: s.selectedConnectionId === id ? null : s.selectedConnectionId,
       dirty: true,
@@ -172,6 +223,7 @@ export const useStore = create<EditorState>((set, get) => ({
 
   addRequirement: (req) => {
     set((s) => ({
+      ...pushUndo(s),
       requirements: [...s.requirements, { ...req, id: uid() }],
       dirty: true,
     }));
@@ -179,6 +231,7 @@ export const useStore = create<EditorState>((set, get) => ({
 
   removeRequirement: (id) => {
     set((s) => ({
+      ...pushUndo(s),
       requirements: s.requirements.filter((r) => r.id !== id),
       dirty: true,
     }));
@@ -188,6 +241,78 @@ export const useStore = create<EditorState>((set, get) => ({
     set({ selectedComponentId: componentId, selectedConnectionId: connectionId }),
 
   setHighlighted: (ids) => set({ highlightedIds: new Set(ids) }),
+
+  deleteSelected: () => {
+    const s = get();
+    if (s.selectedComponentId) {
+      get().removeComponent(s.selectedComponentId);
+    } else if (s.selectedConnectionId) {
+      get().removeConnection(s.selectedConnectionId);
+    }
+  },
+
+  copySelected: () => {
+    const s = get();
+    const comp = s.components.find((c) => c.id === s.selectedComponentId);
+    if (comp) set({ clipboard: comp });
+  },
+
+  cutSelected: () => {
+    get().copySelected();
+    get().deleteSelected();
+  },
+
+  pasteClipboard: () => {
+    const s = get();
+    if (!s.clipboard) return;
+    const newComp: ComponentNode = {
+      ...s.clipboard,
+      id: uid(),
+      x: s.clipboard.x + 40,
+      y: s.clipboard.y + 40,
+      props: { ...s.clipboard.props },
+    };
+    set((st) => ({
+      ...pushUndo(st),
+      components: [...st.components, newComp],
+      selectedComponentId: newComp.id,
+      selectedConnectionId: null,
+      clipboard: newComp,
+      dirty: true,
+    }));
+  },
+
+  undo: () => {
+    const s = get();
+    if (s.past.length === 0) return;
+    const previous = s.past[s.past.length - 1];
+    set({
+      past: s.past.slice(0, -1),
+      future: [snapshot(s), ...s.future].slice(0, MAX_HISTORY),
+      components: previous.components,
+      connections: previous.connections,
+      requirements: previous.requirements,
+      selectedComponentId: null,
+      selectedConnectionId: null,
+      dirty: true,
+    });
+  },
+
+  redo: () => {
+    const s = get();
+    if (s.future.length === 0) return;
+    const next = s.future[0];
+    set({
+      future: s.future.slice(1),
+      past: [...s.past, snapshot(s)].slice(-MAX_HISTORY),
+      components: next.components,
+      connections: next.connections,
+      requirements: next.requirements,
+      selectedComponentId: null,
+      selectedConnectionId: null,
+      dirty: true,
+    });
+  },
 
   save: async () => {
     const s = get();

@@ -87,7 +87,14 @@ export function Canvas() {
     (changes) => {
       for (const change of changes) {
         if (change.type === "position" && change.position) {
-          updateComponentPosition(change.id, change.position.x, change.position.y);
+          // Only push an undo snapshot once the drag ends (dragging === false),
+          // not on every intermediate position update while the mouse moves.
+          updateComponentPosition(
+            change.id,
+            change.position.x,
+            change.position.y,
+            change.dragging === false
+          );
         }
       }
     },
@@ -141,6 +148,7 @@ export function Canvas() {
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        deleteKeyCode={null}
         fitView
       >
         <Background />

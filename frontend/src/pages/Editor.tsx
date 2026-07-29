@@ -9,6 +9,7 @@ import { ResultsPanel } from "../components/ResultsPanel";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useT } from "../i18n";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 export function Editor({ projectId, onBack }: { projectId: string; onBack: () => void }) {
   const t = useT();
@@ -21,6 +22,12 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
   const dirty = useStore((s) => s.dirty);
   const save = useStore((s) => s.save);
   const runSimulation = useStore((s) => s.runSimulation);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const canUndo = useStore((s) => s.past.length > 0);
+  const canRedo = useStore((s) => s.future.length > 0);
+
+  useKeyboardShortcuts();
 
   useEffect(() => {
     loadCatalog();
@@ -38,6 +45,12 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
         <div className="project-title">{projectName || t("loading")}</div>
         <div className="topbar-actions">
           <span className="hint">{dirty ? t("unsavedChanges") : t("saved")}</span>
+          <button disabled={!canUndo} title={t("undoTitle")} onClick={() => undo()}>
+            {t("undo")}
+          </button>
+          <button disabled={!canRedo} title={t("redoTitle")} onClick={() => redo()}>
+            {t("redo")}
+          </button>
           <button disabled={saving} onClick={() => save()}>
             {saving ? t("saving") : t("save")}
           </button>
