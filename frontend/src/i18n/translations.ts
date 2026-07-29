@@ -23,7 +23,6 @@ export const UI = {
     dragHint: "Drag a component onto the canvas.",
 
     propertiesTitle: "Properties",
-    selectHint: "Select a component or connection to edit it.",
     name: "Name",
     replicas: "Replicas",
     capacity: "Capacity (rps)",
@@ -73,8 +72,6 @@ export const UI = {
     redo: "Redo",
     undoTitle: "Undo (Ctrl/Cmd+Z)",
     redoTitle: "Redo (Ctrl/Cmd+Shift+Z)",
-    shortcutsHint:
-      "Shortcuts: Delete/Backspace — delete, Ctrl/Cmd+C/X/V — copy/cut/paste, Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo.",
 
     stop: "Stop",
     liveTitle: "Live traffic",
@@ -133,7 +130,6 @@ export const UI = {
     dragHint: "Перетащите компонент на холст.",
 
     propertiesTitle: "Свойства",
-    selectHint: "Выберите компонент или связь для редактирования.",
     name: "Имя",
     replicas: "Реплики",
     capacity: "Пропускная способность (rps)",
@@ -184,8 +180,6 @@ export const UI = {
     redo: "Повторить",
     undoTitle: "Отменить (Ctrl/Cmd+Z)",
     redoTitle: "Повторить (Ctrl/Cmd+Shift+Z)",
-    shortcutsHint:
-      "Горячие клавиши: Delete/Backspace — удалить, Ctrl/Cmd+C/X/V — копировать/вырезать/вставить, Ctrl/Cmd+Z — отменить, Ctrl/Cmd+Shift+Z — повторить.",
 
     stop: "Стоп",
     liveTitle: "Живой трафик",

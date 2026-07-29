@@ -17,15 +17,8 @@ export function PropertiesPanel() {
   const component = components.find((c) => c.id === selectedComponentId);
   const connection = connections.find((c) => c.id === selectedConnectionId);
 
-  if (!component && !connection) {
-    return (
-      <div className="panel">
-        <h3>{t("propertiesTitle")}</h3>
-        <p className="hint">{t("selectHint")}</p>
-        <p className="hint">{t("shortcutsHint")}</p>
-      </div>
-    );
-  }
+  // Nothing selected — stay out of the way rather than showing an empty panel.
+  if (!component && !connection) return null;
 
   if (component) {
     const defaults = catalog?.types[component.type];
