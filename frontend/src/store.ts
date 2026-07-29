@@ -10,7 +10,17 @@ import type {
 } from "./types";
 
 function uid(): string {
-  return crypto.randomUUID().replace(/-/g, "");
+  // crypto.randomUUID() only exists in secure contexts (localhost/HTTPS) — it's
+  // undefined when the app is opened over plain HTTP via a LAN IP, so fall back
+  // to crypto.getRandomValues (available everywhere) and, failing that, Math.random.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "");
+  }
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 }
 
 interface EditorState {
