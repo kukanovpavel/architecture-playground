@@ -12,7 +12,32 @@ is grounded in [donnemartin/system-design-primer](https://github.com/donnemartin
 
 ## Running it
 
-### Backend
+### Option A: Docker (recommended)
+
+Requires [Docker](https://docs.docker.com/get-docker/) with Compose.
+
+```bash
+docker compose up --build
+```
+
+Open **http://localhost:8080**. The backend is also reachable directly at
+http://localhost:8000 (e.g. for the FastAPI docs at `/docs`).
+
+- `frontend/Dockerfile` builds the React app and serves it via nginx, which
+  proxies `/api/*` to the `backend` container (`frontend/nginx.conf`) — no
+  CORS involved, the browser only ever talks to nginx.
+- `backend/Dockerfile` runs the FastAPI app with uvicorn. The SQLite database
+  lives on a named volume (`backend_data`, mounted at `/app/data`) so data
+  survives `docker compose down` / rebuilds — remove it with
+  `docker compose down -v` to start fresh.
+- First run seeds the 7 example templates below into the empty database
+  (`backend/app/seed_templates.py`).
+
+Stop everything with `docker compose down` (add `-v` to also drop the data volume).
+
+### Option B: Run locally without Docker
+
+#### Backend
 
 ```bash
 cd backend
@@ -26,7 +51,7 @@ This creates `backend/data.db` (SQLite) on first run, pre-seeded with the 7
 example templates below (`backend/app/seed_templates.py` — only runs once,
 against an empty database).
 
-### Frontend
+#### Frontend
 
 ```bash
 cd frontend
@@ -233,10 +258,12 @@ alongside it as `backend/app/simulation/loadsim.py`, selected via
 ## Project layout
 
 ```
+docker-compose.yml   Runs backend + frontend together (see Option A above)
 backend/
+  Dockerfile           Builds the FastAPI image (python:3.12-slim + uvicorn)
   app/
     main.py            FastAPI app, CORS, router wiring
-    database.py         SQLAlchemy engine/session (SQLite)
+    database.py         SQLAlchemy engine/session (SQLite; DATABASE_URL env override)
     models.py            ORM models: Project, Component, Connection, Requirement
     schemas.py             Pydantic models (Finding.details carries raw values for i18n)
     catalog.py               Static component catalog (system-design-primer types)
@@ -248,6 +275,8 @@ backend/
     simulation/
       heuristics.py               Rule engine (Phase 1)
 frontend/
+  Dockerfile           Multi-stage build: node -> static assets served by nginx
+  nginx.conf           Serves the SPA and proxies /api/* to the backend container
   src/
     api/client.ts       Typed fetch wrapper
     store.ts             zustand store for the current space
