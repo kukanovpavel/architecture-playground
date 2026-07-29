@@ -86,3 +86,5 @@ class Finding(BaseModel):
 class SimulationResult(BaseModel):
     mode: str
     findings: list[Finding]
+    # Populated for mode="load": per-component/connection throughput snapshot.
+    load: Optional[dict] = None

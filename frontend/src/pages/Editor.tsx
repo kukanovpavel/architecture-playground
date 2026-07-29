@@ -6,6 +6,7 @@ import { Canvas } from "../components/Canvas";
 import { PropertiesPanel } from "../components/PropertiesPanel";
 import { RequirementsPanel } from "../components/RequirementsPanel";
 import { ResultsPanel } from "../components/ResultsPanel";
+import { LiveStatsPanel } from "../components/LiveStatsPanel";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useT } from "../i18n";
@@ -22,6 +23,8 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
   const dirty = useStore((s) => s.dirty);
   const save = useStore((s) => s.save);
   const runSimulation = useStore((s) => s.runSimulation);
+  const stopSimulation = useStore((s) => s.stopSimulation);
+  const liveRunning = useStore((s) => s.liveRunning);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const canUndo = useStore((s) => s.past.length > 0);
@@ -31,7 +34,14 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
 
   useEffect(() => {
     loadCatalog();
-    openProject(projectId);
+    // ?autorun=1 (optionally with &rate=<rps>) starts the live simulation as
+    // soon as the space loads — handy for demo links and reproducible screenshots.
+    const params = new URLSearchParams(window.location.search);
+    const autorun = params.get("autorun") === "1";
+    const rate = Number(params.get("rate"));
+    openProject(projectId).then(() => {
+      if (autorun) runSimulation(rate > 0 ? rate : undefined);
+    });
     return () => reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
@@ -54,9 +64,15 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
           <button disabled={saving} onClick={() => save()}>
             {saving ? t("saving") : t("save")}
           </button>
-          <button className="primary" disabled={simulating} onClick={() => runSimulation()}>
-            {simulating ? t("running") : t("run")}
-          </button>
+          {liveRunning ? (
+            <button className="danger-solid" onClick={() => stopSimulation()}>
+              ■ {t("stop")}
+            </button>
+          ) : (
+            <button className="primary" disabled={simulating} onClick={() => runSimulation()}>
+              {simulating ? t("running") : `▶ ${t("run")}`}
+            </button>
+          )}
           <div className="header-actions">
             <ThemeSwitcher />
             <LanguageSwitcher />
@@ -69,6 +85,7 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
           <Canvas />
         </ReactFlowProvider>
         <div className="right-column">
+          <LiveStatsPanel />
           <PropertiesPanel />
           <RequirementsPanel />
           <ResultsPanel />

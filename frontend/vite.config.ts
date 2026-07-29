@@ -9,6 +9,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        // The live load simulation streams over a WebSocket.
+        ws: true,
       },
     },
   },

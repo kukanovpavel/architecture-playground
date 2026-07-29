@@ -81,4 +81,44 @@ export interface Finding {
 export interface SimulationResult {
   mode: string;
   findings: Finding[];
+  load?: LoadTick | null;
+}
+
+// --- Live load simulation ---
+
+export interface ComponentLoad {
+  offered: number;
+  accepted: number;
+  dropped: number;
+  capacity: number | null;
+  utilization: number;
+  latency_ms: number;
+  saturated: boolean;
+}
+
+export interface ConnectionLoad {
+  rps: number;
+  protocol: Protocol;
+  saturated: boolean;
+}
+
+export interface LoadTotals {
+  arrival_rps: number;
+  base_rps: number;
+  served_rps: number;
+  dropped_rps: number;
+  max_utilization: number;
+  critical_path_latency_ms: number;
+  bottleneck_id: string | null;
+  total_requests: number;
+  total_dropped: number;
+}
+
+export interface LoadTick {
+  type?: string;
+  tick: number;
+  elapsed_s: number;
+  components: Record<string, ComponentLoad>;
+  connections: Record<string, ConnectionLoad>;
+  totals: LoadTotals;
 }

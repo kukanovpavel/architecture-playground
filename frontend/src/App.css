@@ -220,6 +220,106 @@
   color: #bfdbfe;
 }
 
+/* --- Live load indicators on canvas nodes --- */
+.node-load {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--color-border);
+}
+.node-load-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.node-load-rps {
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+.node-load-util {
+  font-weight: 700;
+  font-size: 11px;
+}
+.node-load-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-border);
+  overflow: hidden;
+  margin-top: 3px;
+}
+.node-load-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+.node-load-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+.node-load-dropped {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* --- Live metrics panel --- */
+.live-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.live-stat {
+  background: var(--color-surface);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.live-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-secondary);
+}
+.live-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  margin-top: 1px;
+}
+.live-running-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
+  margin-right: 6px;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.rate-slider {
+  margin-bottom: 10px;
+}
+.rate-slider input[type="range"] {
+  width: 100%;
+  padding: 0;
+}
+.bottleneck-callout {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: var(--color-danger);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
 .results-group {
   margin-bottom: 12px;
 }

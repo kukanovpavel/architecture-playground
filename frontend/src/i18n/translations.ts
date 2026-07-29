@@ -75,6 +75,21 @@ export const UI = {
     redoTitle: "Redo (Ctrl/Cmd+Shift+Z)",
     shortcutsHint:
       "Shortcuts: Delete/Backspace — delete, Ctrl/Cmd+C/X/V — copy/cut/paste, Ctrl/Cmd+Z — undo, Ctrl/Cmd+Shift+Z — redo.",
+
+    stop: "Stop",
+    liveTitle: "Live traffic",
+    liveStopped: "Simulation stopped — showing the last measured state.",
+    trafficRate: "Traffic rate",
+    bottleneck: "Bottleneck",
+    statIncoming: "Incoming rps",
+    statServed: "Served rps",
+    statDropped: "Dropped rps",
+    statMaxUtil: "Peak utilization",
+    statLatency: "Critical path",
+    statElapsed: "Elapsed",
+    statTotalRequests: "Total requests",
+    statTotalDropped: "dropped",
+    droppedShort: "drop",
   },
   ru: {
     appTitle: "Конструктор архитектур",
@@ -153,6 +168,21 @@ export const UI = {
     redoTitle: "Повторить (Ctrl/Cmd+Shift+Z)",
     shortcutsHint:
       "Горячие клавиши: Delete/Backspace — удалить, Ctrl/Cmd+C/X/V — копировать/вырезать/вставить, Ctrl/Cmd+Z — отменить, Ctrl/Cmd+Shift+Z — повторить.",
+
+    stop: "Стоп",
+    liveTitle: "Живой трафик",
+    liveStopped: "Симуляция остановлена — показано последнее измеренное состояние.",
+    trafficRate: "Интенсивность трафика",
+    bottleneck: "Узкое место",
+    statIncoming: "Входящий rps",
+    statServed: "Обработано rps",
+    statDropped: "Отброшено rps",
+    statMaxUtil: "Пиковая загрузка",
+    statLatency: "Критический путь",
+    statElapsed: "Прошло",
+    statTotalRequests: "Всего запросов",
+    statTotalDropped: "отброшено",
+    droppedShort: "потери",
   },
 } as const;
 

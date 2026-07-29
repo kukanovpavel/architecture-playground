@@ -73,18 +73,80 @@ Open http://localhost:5173 — the Vite dev server proxies `/api` to `http://loc
 4. **Requirements** — declare non-functional requirements (max latency, min
    throughput, min availability) or functional requirements (a required component
    sequence a request must pass through).
-5. **Run** — saves the space and runs it through the heuristic rule engine, which
-   checks for single points of failure, missing load balancers, direct
-   client-to-database access, databases without caching, missing async
-   decoupling, latency budget overruns, throughput bottlenecks, and estimated
-   composite availability — then reports findings grouped by severity. Hover a
-   finding to highlight the affected components/connections on the canvas.
-6. **Language / theme** — the buttons in the top-right corner switch the UI
+5. **Run** — saves the space, reports the static findings (see [Static
+   checks](#static-checks)), then **starts a live traffic simulation that keeps
+   running until you press Stop** (see [Live simulation](#live-simulation)).
+6. **Editing** — `Delete`/`Backspace` removes the selected component or
+   connection, `Ctrl/Cmd+C/X/V` copies/cuts/pastes a component, `Ctrl/Cmd+Z` and
+   `Ctrl/Cmd+Shift+Z` undo and redo, `Escape` clears the selection.
+7. **Language / theme** — the buttons in the top-right corner switch the UI
    between English/Russian and light/dark. Both choices persist in
    `localStorage`.
-7. **Shareable/deep links** — `?project=<id>` opens straight into a space, and
-   `?theme=light|dark` / `?lang=en|ru` force a specific look on load
-   (`frontend/src/App.tsx`) — used to generate the screenshots below.
+8. **Shareable/deep links** — `?project=<id>` opens straight into a space;
+   `?theme=light|dark` and `?lang=en|ru` force a specific look on load; and
+   `?autorun=1&rate=<rps>` starts the live simulation immediately at a given
+   traffic level. Used to generate the screenshots in this README.
+
+## Live simulation
+
+Pressing **Run** opens a WebSocket to the backend, which pushes a request
+stream through the graph and streams a snapshot of the whole system twice a
+second. It keeps running — with traffic jitter, so the numbers move — until you
+press **Stop**.
+
+![Live traffic flowing through a horizontally scaled web tier](docs/screenshots/live-simulation.png)
+
+While it runs:
+
+- **Every connection animates**, with the dash speed, stroke width, and colour
+  scaled to the rps flowing through it, and the live rps printed on the edge.
+- **Every component shows its own load**: accepted rps, utilization against its
+  capacity, a colour-coded bar (green → amber → red), current latency, and how
+  much traffic it's shedding.
+- **The Live traffic panel** tracks incoming/served/dropped rps, peak
+  utilization, critical-path latency, elapsed time, and cumulative totals. A
+  slider adjusts the traffic level on the fly, without restarting.
+
+Push the traffic past what the design can absorb and the failure becomes
+obvious — the saturated component is called out as the bottleneck, edges feeding
+it turn red, latency climbs, and dropped requests start accumulating:
+
+![The database saturating at 379% utilization and shedding traffic](docs/screenshots/live-simulation-overload.png)
+
+### How traffic is routed
+
+The arrival rate defaults to a `min_throughput_rps` requirement if you've
+declared one (otherwise 200 rps). From each component, traffic is forwarded by
+edge category (`backend/app/simulation/loadsim.py`):
+
+| Downstream edge | Behaviour |
+| --- | --- |
+| App/edge tier (load balancer → servers, gateway → services) | **Splits** the request stream between peers |
+| Cache **and** datastore | **Cache-aside**: the cache absorbs 80%, the datastore only sees the misses |
+| Datastore only | Each request does data work — full rate, split across shards |
+| `async_queue` | Fire-and-forget: the target gets the full stream, but it stays out of the synchronous latency path |
+
+Connections lying on a declared **functional** (`path_exists`) requirement get
+double routing weight, so declared user journeys carry more traffic than
+incidental links.
+
+Each component accepts up to `capacity_rps × replicas` and sheds the rest.
+Latency follows an M/M/1-style curve — it climbs steeply as utilization
+approaches 100%, which is why a saturated component's latency spikes rather
+than degrading linearly.
+
+For a single non-streaming snapshot (scripting, CI), use
+`POST /api/projects/{id}/simulate?mode=load`.
+
+## Static checks
+
+Run also reports one-shot findings from the rule engine
+(`backend/app/simulation/heuristics.py`): single points of failure, missing load
+balancers, direct client-to-database access, databases without caching, missing
+async decoupling, latency budget overruns, throughput bottlenecks, estimated
+composite availability, and whether each functional path requirement is
+satisfied. Findings are grouped by severity; hover one to highlight the
+components and connections it refers to.
 
 ## Example architectures
 
@@ -248,12 +310,14 @@ flowchart LR
 
 ## Simulation engine
 
-Phase 1 (shipped) is a rule-based heuristic checker:
-`backend/app/simulation/heuristics.py`.
+Two complementary engines live side by side under `backend/app/simulation/`:
 
-A discrete-event load simulation (Phase 2, not yet built) is intended to live
-alongside it as `backend/app/simulation/loadsim.py`, selected via
-`POST /api/projects/{id}/simulate?mode=load` (currently returns `501`).
+| | `heuristics.py` | `loadsim.py` |
+| --- | --- | --- |
+| Answers | "Is this design sound?" | "What happens when traffic flows through it?" |
+| Shape | One-shot rule evaluation | Continuous flow model, streamed over a WebSocket |
+| Surfaced as | Run results panel | Live traffic panel + canvas animation |
+| API | `POST /simulate` (`mode=heuristic`) | `WS /simulate/live`, or `POST /simulate?mode=load` for one snapshot |
 
 ## Project layout
 
@@ -271,17 +335,22 @@ backend/
     routers/
       projects.py             CRUD + full-graph save/load
       catalog.py                GET /api/catalog
-      simulate.py                 POST /api/projects/{id}/simulate
+      simulate.py                 POST /simulate + WS /simulate/live
     simulation/
-      heuristics.py               Rule engine (Phase 1)
+      heuristics.py               Static rule engine
+      loadsim.py                   Traffic flow model driving the live simulation
 frontend/
   Dockerfile           Multi-stage build: node -> static assets served by nginx
-  nginx.conf           Serves the SPA and proxies /api/* to the backend container
+  nginx.conf           Serves the SPA, proxies /api/* and upgrades WebSockets
   src/
     api/client.ts       Typed fetch wrapper
+    api/liveSimulation.ts  WebSocket client for the live simulation
     store.ts             zustand store for the current space
     types.ts              Shared TS types
+    format.ts              rps formatting + utilization colour scale
     categoryColors.ts       Category -> accent color mapping
+    hooks/
+      useKeyboardShortcuts.ts  Delete / copy-paste / undo-redo bindings
     i18n/
       language.ts             Persisted EN/RU language store
       translations.ts          UI chrome strings (EN/RU)
@@ -296,8 +365,9 @@ frontend/
       ComponentNodeView.tsx       Custom node renderer
       PropertiesPanel.tsx          Edit selected component/connection
       RequirementsPanel.tsx         Add/list requirements
-      ResultsPanel.tsx                Run results, hover-to-highlight
-      LanguageSwitcher.tsx             EN/RU toggle button
+      ResultsPanel.tsx                Static findings, hover-to-highlight
+      LiveStatsPanel.tsx               Live traffic metrics + rate slider
+      LanguageSwitcher.tsx              EN/RU toggle button
       ThemeSwitcher.tsx                  Light/dark toggle button
     pages/
       ProjectList.tsx     Home page: list/create/open/delete spaces

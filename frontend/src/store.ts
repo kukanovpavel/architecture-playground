@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import { api } from "./api/client";
+import { LiveSimulationSocket } from "./api/liveSimulation";
 import type {
   Catalog,
   ComponentNode,
   Connection,
   Finding,
+  LoadTick,
   ProjectDetail,
   Requirement,
 } from "./types";
@@ -50,6 +52,11 @@ interface EditorState {
   past: HistorySnapshot[];
   future: HistorySnapshot[];
 
+  liveRunning: boolean;
+  liveTick: LoadTick | null;
+  liveRate: number | null;
+  liveError: string | null;
+
   loadCatalog: () => Promise<void>;
   openProject: (id: string) => Promise<void>;
   reset: () => void;
@@ -77,7 +84,9 @@ interface EditorState {
   redo: () => void;
 
   save: () => Promise<void>;
-  runSimulation: () => Promise<void>;
+  runSimulation: (initialRate?: number) => Promise<void>;
+  stopSimulation: () => void;
+  setLiveRate: (rps: number) => void;
 }
 
 function snapshot(s: Pick<EditorState, "components" | "connections" | "requirements">): HistorySnapshot {
@@ -96,6 +105,10 @@ function pushUndo(s: EditorState): Pick<EditorState, "past" | "future"> {
     future: [],
   };
 }
+
+// Lives outside the store: it's an imperative connection handle, not state to
+// render. The store only mirrors what the UI needs to know about it.
+let liveSocket: LiveSimulationSocket | null = null;
 
 export const useStore = create<EditorState>((set, get) => ({
   catalog: null,
@@ -116,6 +129,11 @@ export const useStore = create<EditorState>((set, get) => ({
   past: [],
   future: [],
 
+  liveRunning: false,
+  liveTick: null,
+  liveRate: null,
+  liveError: null,
+
   loadCatalog: async () => {
     if (get().catalog) return;
     const catalog = await api.getCatalog();
@@ -123,6 +141,8 @@ export const useStore = create<EditorState>((set, get) => ({
   },
 
   openProject: async (id: string) => {
+    liveSocket?.stop();
+    liveSocket = null;
     const project: ProjectDetail = await api.getProject(id);
     set({
       projectId: project.id,
@@ -138,10 +158,16 @@ export const useStore = create<EditorState>((set, get) => ({
       clipboard: null,
       past: [],
       future: [],
+      liveRunning: false,
+      liveTick: null,
+      liveRate: null,
+      liveError: null,
     });
   },
 
-  reset: () =>
+  reset: () => {
+    liveSocket?.stop();
+    liveSocket = null;
     set({
       projectId: null,
       projectName: "",
@@ -156,7 +182,12 @@ export const useStore = create<EditorState>((set, get) => ({
       clipboard: null,
       past: [],
       future: [],
-    }),
+      liveRunning: false,
+      liveTick: null,
+      liveRate: null,
+      liveError: null,
+    });
+  },
 
   addComponent: (type, x, y) => {
     const catalog = get().catalog;
@@ -336,16 +367,42 @@ export const useStore = create<EditorState>((set, get) => ({
     }
   },
 
-  runSimulation: async () => {
+  runSimulation: async (initialRate) => {
     const s = get();
-    if (!s.projectId) return;
+    if (!s.projectId || s.liveRunning) return;
+
+    // Save first so the backend simulates exactly what's on the canvas, then
+    // report the static findings before opening the live stream.
     await get().save();
-    set({ simulating: true });
+    set({ simulating: true, liveError: null });
     try {
       const result = await api.simulate(s.projectId);
       set({ findings: result.findings });
     } finally {
       set({ simulating: false });
     }
+
+    liveSocket?.stop();
+    liveSocket = new LiveSimulationSocket(s.projectId, {
+      onTick: (tick) => set({ liveTick: tick }),
+      onStarted: (baseRps) => {
+        set({ liveRunning: true, liveRate: initialRate ?? baseRps });
+        if (initialRate !== undefined) liveSocket?.setRate(initialRate);
+      },
+      onError: (detail) => set({ liveError: detail, liveRunning: false }),
+      onClosed: () => set({ liveRunning: false }),
+    });
+    liveSocket.start();
+  },
+
+  stopSimulation: () => {
+    liveSocket?.stop();
+    liveSocket = null;
+    set({ liveRunning: false });
+  },
+
+  setLiveRate: (rps) => {
+    set({ liveRate: rps });
+    liveSocket?.setRate(rps);
   },
 }));

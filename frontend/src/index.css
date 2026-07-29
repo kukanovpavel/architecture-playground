@@ -86,6 +86,16 @@ button.danger {
   border-color: var(--color-danger-border);
 }
 
+button.danger-solid {
+  background: #dc2626;
+  color: #fff;
+  border-color: #dc2626;
+  font-weight: 600;
+}
+button.danger-solid:hover {
+  background: #b91c1c;
+}
+
 button.link {
   border: none;
   background: none;

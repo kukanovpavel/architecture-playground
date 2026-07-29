@@ -17,6 +17,7 @@ import { useStore } from "../store";
 import { ComponentNodeView, type ComponentNodeData } from "./ComponentNodeView";
 import { useCatalogText } from "../i18n";
 import { useThemeStore } from "../theme";
+import { formatRps } from "../format";
 
 const nodeTypes = { component: ComponentNodeView };
 
@@ -37,6 +38,8 @@ export function Canvas() {
   const select = useStore((s) => s.select);
   const catalogText = useCatalogText();
   const theme = useThemeStore((s) => s.theme);
+  const liveTick = useStore((s) => s.liveTick);
+  const liveRunning = useStore((s) => s.liveRunning);
 
   const nodes: Node[] = useMemo(
     () =>
@@ -49,6 +52,8 @@ export function Canvas() {
           category: (entry?.category ?? "application") as ComponentNodeData["category"],
           replicas: c.props.replicas ?? 1,
           highlighted: highlightedIds.has(c.id),
+          load: liveTick?.components[c.id] ?? null,
+          isBottleneck: liveTick?.totals.bottleneck_id === c.id,
         };
         return {
           id: c.id,
@@ -58,14 +63,57 @@ export function Canvas() {
           selected: c.id === selectedComponentId,
         };
       }),
-    [components, catalog, highlightedIds, selectedComponentId, catalogText]
+    [components, catalog, highlightedIds, selectedComponentId, catalogText, liveTick]
   );
+
+  // Busiest edge sets the scale, so stroke width stays readable whether the
+  // design runs at 50 rps or 50k.
+  const peakRps = useMemo(() => {
+    if (!liveTick) return 0;
+    return Object.values(liveTick.connections).reduce((max, c) => Math.max(max, c.rps), 0);
+  }, [liveTick]);
 
   const edges: Edge[] = useMemo(
     () =>
       connections.map((conn) => {
         const isAsync = conn.protocol === "async_queue";
         const highlighted = highlightedIds.has(conn.id);
+        const load = liveTick?.connections[conn.id];
+
+        if (liveRunning && load) {
+          const share = peakRps > 0 ? load.rps / peakRps : 0;
+          const idle = load.rps < 0.5;
+          // Faster dash march for heavier traffic: 1.6s when barely flowing,
+          // down to 0.25s at the peak.
+          const duration = idle ? 0 : 1.6 - share * 1.35;
+          const stroke = load.saturated
+            ? "#dc2626"
+            : isAsync
+              ? "#db2777"
+              : highlighted
+                ? "#dc2626"
+                : "#2563eb";
+          return {
+            id: conn.id,
+            source: conn.source_id,
+            target: conn.target_id,
+            label: idle ? "—" : `${formatRps(load.rps)} rps`,
+            animated: !idle,
+            selected: conn.id === selectedConnectionId,
+            labelStyle: { fill: stroke, fontWeight: 700, fontSize: 11 },
+            labelBgPadding: [4, 2] as [number, number],
+            labelBgBorderRadius: 4,
+            labelBgStyle: { fill: "var(--color-bg-panel)", fillOpacity: 0.9 },
+            style: {
+              stroke,
+              strokeWidth: idle ? 1 : 1.5 + share * 4,
+              strokeDasharray: isAsync ? "5 4" : undefined,
+              animationDuration: duration ? `${duration.toFixed(2)}s` : undefined,
+              opacity: idle ? 0.35 : 1,
+            },
+          };
+        }
+
         return {
           id: conn.id,
           source: conn.source_id,
@@ -80,7 +128,7 @@ export function Canvas() {
           },
         };
       }),
-    [connections, highlightedIds, selectedConnectionId]
+    [connections, highlightedIds, selectedConnectionId, liveTick, liveRunning, peakRps]
   );
 
   const onNodesChange: OnNodesChange = useCallback(
