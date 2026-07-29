@@ -1,0 +1,5 @@
+backend/venv/
+backend/__pycache__/
+backend/app/**/__pycache__/
+backend/data.db
+.DS_Store
