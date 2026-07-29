@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { api } from "./api/client";
 import { LiveSimulationSocket } from "./api/liveSimulation";
 import type {
+  AdviceResult,
   Catalog,
   ComponentNode,
   Connection,
@@ -56,6 +57,11 @@ interface EditorState {
   liveTick: LoadTick | null;
   liveRate: number | null;
   liveError: string | null;
+  /** Highest arrival rate seen during the run — what the advice is judged against. */
+  livePeakRps: number;
+
+  advice: AdviceResult | null;
+  advising: boolean;
 
   loadCatalog: () => Promise<void>;
   openProject: (id: string) => Promise<void>;
@@ -87,6 +93,7 @@ interface EditorState {
   runSimulation: (initialRate?: number) => Promise<void>;
   stopSimulation: () => void;
   setLiveRate: (rps: number) => void;
+  fetchAdvice: () => Promise<void>;
 }
 
 function snapshot(s: Pick<EditorState, "components" | "connections" | "requirements">): HistorySnapshot {
@@ -133,6 +140,10 @@ export const useStore = create<EditorState>((set, get) => ({
   liveTick: null,
   liveRate: null,
   liveError: null,
+  livePeakRps: 0,
+
+  advice: null,
+  advising: false,
 
   loadCatalog: async () => {
     if (get().catalog) return;
@@ -162,6 +173,9 @@ export const useStore = create<EditorState>((set, get) => ({
       liveTick: null,
       liveRate: null,
       liveError: null,
+      livePeakRps: 0,
+      advice: null,
+      advising: false,
     });
   },
 
@@ -186,6 +200,9 @@ export const useStore = create<EditorState>((set, get) => ({
       liveTick: null,
       liveRate: null,
       liveError: null,
+      livePeakRps: 0,
+      advice: null,
+      advising: false,
     });
   },
 
@@ -384,7 +401,11 @@ export const useStore = create<EditorState>((set, get) => ({
 
     liveSocket?.stop();
     liveSocket = new LiveSimulationSocket(s.projectId, {
-      onTick: (tick) => set({ liveTick: tick }),
+      onTick: (tick) =>
+        set((st) => ({
+          liveTick: tick,
+          livePeakRps: Math.max(st.livePeakRps, tick.totals.arrival_rps),
+        })),
       onStarted: (baseRps) => {
         set({ liveRunning: true, liveRate: initialRate ?? baseRps });
         if (initialRate !== undefined) liveSocket?.setRate(initialRate);
@@ -399,10 +420,29 @@ export const useStore = create<EditorState>((set, get) => ({
     liveSocket?.stop();
     liveSocket = null;
     set({ liveRunning: false });
+    // The run just finished — analyze what it revealed.
+    get().fetchAdvice();
   },
 
   setLiveRate: (rps) => {
     set({ liveRate: rps });
     liveSocket?.setRate(rps);
+  },
+
+  fetchAdvice: async () => {
+    const s = get();
+    if (!s.projectId || s.advising) return;
+    set({ advising: true });
+    try {
+      // Judge the design against the worst traffic it actually saw, so the
+      // advice lines up with the saturation the user just watched.
+      const rate = s.livePeakRps > 0 ? s.livePeakRps : (s.liveRate ?? undefined);
+      const advice = await api.advise(s.projectId, rate);
+      set({ advice });
+    } catch {
+      set({ advice: null });
+    } finally {
+      set({ advising: false });
+    }
   },
 }));

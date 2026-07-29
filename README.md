@@ -76,6 +76,7 @@ Open http://localhost:5173 — the Vite dev server proxies `/api` to `http://loc
 5. **Run** — saves the space, reports the static findings (see [Static
    checks](#static-checks)), then **starts a live traffic simulation that keeps
    running until you press Stop** (see [Live simulation](#live-simulation)).
+   Stopping produces [recommendations](#recommendations) for what to fix.
 6. **Editing** — `Delete`/`Backspace` removes the selected component or
    connection, `Ctrl/Cmd+C/X/V` copies/cuts/pastes a component, `Ctrl/Cmd+Z` and
    `Ctrl/Cmd+Shift+Z` undo and redo, `Escape` clears the selection.
@@ -137,6 +138,42 @@ than degrading linearly.
 
 For a single non-streaming snapshot (scripting, CI), use
 `POST /api/projects/{id}/simulate?mode=load`.
+
+## Recommendations
+
+Stopping a run analyzes what it revealed and turns it into a prioritized list of
+changes — grounded in the numbers the simulation actually produced, at the
+**peak traffic level the run reached**, so the advice matches the saturation you
+just watched.
+
+![Recommendations generated from a saturated run](docs/screenshots/recommendations.png)
+
+Every recommendation answers three questions:
+
+- **What to do** — e.g. *Scale out "Relational DB": 1 → 5 replicas*
+- **Why**, in measured terms — *taking 2.2k rps against 500 rps of capacity and shedding 1.7k rps; latency has climbed to 750 ms*
+- **How**, as steps in this tool — *select it, set Replicas to 5*, or *drop an App Cache onto the canvas and connect the app tier to it*
+
+...plus the **expected effect** wherever it's computable: how much capacity the
+extra replicas buy, or that an 80%-hit cache takes a datastore from 2.0k to
+400 rps.
+
+What it looks for (`backend/app/simulation/advisor.py`):
+
+| Priority | Recommendation |
+| --- | --- |
+| Critical | Saturated components (with the exact replica count needed), client→DB access, and any declared throughput or latency requirement the run missed |
+| High | Hot datastores with no cache upstream, single points of failure carrying real traffic, availability below target, components with no headroom left |
+| Medium | Missing queue in front of an overloaded datastore, parallel instances with no load balancer |
+| Low | No CDN in front of high-volume edge traffic, over-provisioned idle capacity |
+
+A design that absorbs its traffic with headroom gets no recommendations at all —
+the panel says so rather than inventing filler. Following the advice closes the
+loop: on the horizontally-scaled example at 2.2k rps, applying the suggested
+replica counts and cache moves it from 22% of traffic served (1.7k rps dropped,
+400% peak utilization) to 100% served, nothing dropped, 56% peak.
+
+Available as `POST /api/projects/{id}/advise?rate=<rps>`.
 
 ## Static checks
 
@@ -310,14 +347,14 @@ flowchart LR
 
 ## Simulation engine
 
-Two complementary engines live side by side under `backend/app/simulation/`:
+Three engines live side by side under `backend/app/simulation/`:
 
-| | `heuristics.py` | `loadsim.py` |
-| --- | --- | --- |
-| Answers | "Is this design sound?" | "What happens when traffic flows through it?" |
-| Shape | One-shot rule evaluation | Continuous flow model, streamed over a WebSocket |
-| Surfaced as | Run results panel | Live traffic panel + canvas animation |
-| API | `POST /simulate` (`mode=heuristic`) | `WS /simulate/live`, or `POST /simulate?mode=load` for one snapshot |
+| | `heuristics.py` | `loadsim.py` | `advisor.py` |
+| --- | --- | --- | --- |
+| Answers | "Is this design sound?" | "What happens when traffic flows through it?" | "So what should I change?" |
+| Shape | One-shot rule evaluation | Continuous flow model, streamed over a WebSocket | Reads a simulated state, emits prioritized fixes |
+| Surfaced as | Run results panel | Live traffic panel + canvas animation | Recommendations panel |
+| API | `POST /simulate` | `WS /simulate/live`, or `POST /simulate?mode=load` | `POST /advise?rate=<rps>` |
 
 ## Project layout
 
@@ -335,10 +372,11 @@ backend/
     routers/
       projects.py             CRUD + full-graph save/load
       catalog.py                GET /api/catalog
-      simulate.py                 POST /simulate + WS /simulate/live
+      simulate.py                 POST /simulate, POST /advise, WS /simulate/live
     simulation/
       heuristics.py               Static rule engine
       loadsim.py                   Traffic flow model driving the live simulation
+      advisor.py                    Turns simulated load into ranked recommendations
 frontend/
   Dockerfile           Multi-stage build: node -> static assets served by nginx
   nginx.conf           Serves the SPA, proxies /api/* and upgrades WebSockets
@@ -355,7 +393,8 @@ frontend/
       language.ts             Persisted EN/RU language store
       translations.ts          UI chrome strings (EN/RU)
       catalogI18n.ts             Catalog label/description/category translations
-      findings.ts                  Localized message templates, keyed by rule_id
+      findings.ts                  Localized finding messages, keyed by rule_id
+      recommendations.ts            Localized what/why/how/impact per recommendation
       index.ts                       useT / useCatalogText / useFindingMessage hooks
     theme/
       themeStore.ts            Persisted light/dark theme store
@@ -367,6 +406,7 @@ frontend/
       RequirementsPanel.tsx         Add/list requirements
       ResultsPanel.tsx                Static findings, hover-to-highlight
       LiveStatsPanel.tsx               Live traffic metrics + rate slider
+      RecommendationsPanel.tsx          Ranked improvements from the last run
       LanguageSwitcher.tsx              EN/RU toggle button
       ThemeSwitcher.tsx                  Light/dark toggle button
     pages/

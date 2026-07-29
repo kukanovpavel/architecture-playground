@@ -7,6 +7,7 @@ import { PropertiesPanel } from "../components/PropertiesPanel";
 import { RequirementsPanel } from "../components/RequirementsPanel";
 import { ResultsPanel } from "../components/ResultsPanel";
 import { LiveStatsPanel } from "../components/LiveStatsPanel";
+import { RecommendationsPanel } from "../components/RecommendationsPanel";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useT } from "../i18n";
@@ -86,6 +87,7 @@ export function Editor({ projectId, onBack }: { projectId: string; onBack: () =>
         </ReactFlowProvider>
         <div className="right-column">
           <LiveStatsPanel />
+          <RecommendationsPanel />
           <PropertiesPanel />
           <RequirementsPanel />
           <ResultsPanel />

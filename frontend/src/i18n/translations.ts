@@ -90,6 +90,24 @@ export const UI = {
     statTotalRequests: "Total requests",
     statTotalDropped: "dropped",
     droppedShort: "drop",
+
+    recommendationsTitle: "How to improve this",
+    recommendationsHint:
+      "Run the simulation to see what breaks under load and what to do about it.",
+    analyzing: "Analyzing…",
+    analyze: "Analyze",
+    reanalyze: "Re-analyze",
+    analyzedAt: "Analyzed at",
+    servedShare: "served",
+    adviceHealthy:
+      "This design handles the simulated traffic with headroom — nothing to fix at this level.",
+    adviceStale: "The architecture changed since this analysis — re-run to refresh it.",
+    adviceAction: "Do this",
+    adviceImpact: "Expected effect",
+    priorityCritical: "Critical",
+    priorityHigh: "High",
+    priorityMedium: "Medium",
+    priorityLow: "Low",
   },
   ru: {
     appTitle: "Конструктор архитектур",
@@ -183,6 +201,24 @@ export const UI = {
     statTotalRequests: "Всего запросов",
     statTotalDropped: "отброшено",
     droppedShort: "потери",
+
+    recommendationsTitle: "Как улучшить архитектуру",
+    recommendationsHint:
+      "Запустите симуляцию, чтобы увидеть, что ломается под нагрузкой и что с этим делать.",
+    analyzing: "Анализ…",
+    analyze: "Анализировать",
+    reanalyze: "Проанализировать заново",
+    analyzedAt: "Анализ при",
+    servedShare: "обработано",
+    adviceHealthy:
+      "Архитектура выдерживает смоделированную нагрузку с запасом — на этом уровне исправлять нечего.",
+    adviceStale: "Архитектура изменилась после анализа — запустите проверку заново.",
+    adviceAction: "Что сделать",
+    adviceImpact: "Ожидаемый эффект",
+    priorityCritical: "Критично",
+    priorityHigh: "Важно",
+    priorityMedium: "Средне",
+    priorityLow: "Низко",
   },
 } as const;
 

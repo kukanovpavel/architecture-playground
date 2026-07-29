@@ -88,3 +88,28 @@ class SimulationResult(BaseModel):
     findings: list[Finding]
     # Populated for mode="load": per-component/connection throughput snapshot.
     load: Optional[dict] = None
+
+
+class Recommendation(BaseModel):
+    rule_id: str
+    priority: str  # critical | high | medium | low
+    component_ids: list[str] = []
+    connection_ids: list[str] = []
+    # Raw measured values behind the advice, so the client can render it localized.
+    details: dict = {}
+
+
+class AdviceSummary(BaseModel):
+    served_ratio: float
+    dropped_rps: float
+    max_utilization: float
+    critical_path_latency_ms: float
+    critical_count: int
+    high_count: int
+    healthy: bool
+
+
+class AdviceResult(BaseModel):
+    arrival_rps: float
+    summary: AdviceSummary
+    recommendations: list[Recommendation]

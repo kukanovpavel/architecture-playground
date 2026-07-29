@@ -1,10 +1,12 @@
 import asyncio
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from .. import models, schemas
 from ..database import SessionLocal, get_db
+from ..simulation.advisor import advise
 from ..simulation.heuristics import run_heuristics
 from ..simulation.loadsim import FlowGraph, LiveSimulation, Snapshot, base_arrival_rps, compute_tick
 
@@ -38,6 +40,29 @@ def simulate(project_id: str, mode: str = "heuristic", db: Session = Depends(get
         return schemas.SimulationResult(mode="load", findings=[], load=state)
 
     raise HTTPException(status_code=400, detail=f"Unknown simulation mode: {mode}")
+
+
+@router.post("/{project_id}/advise", response_model=schemas.AdviceResult)
+def advise_project(
+    project_id: str, rate: Optional[float] = None, db: Session = Depends(get_db)
+):
+    """Recommendations derived from running the design at a given traffic level.
+
+    The flow is recomputed server-side rather than trusting client-reported
+    metrics, so the advice always matches what the model actually produces.
+    """
+    project = db.get(models.Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    snapshot = _snapshot(project)
+    if not snapshot.components:
+        raise HTTPException(status_code=400, detail="Nothing to analyze")
+
+    graph = FlowGraph(snapshot.components, snapshot.connections, snapshot.requirements)
+    arrival = rate if rate and rate > 0 else base_arrival_rps(snapshot.requirements)
+    state = compute_tick(graph, arrival)
+    return advise(graph, state, snapshot.requirements, arrival)
 
 
 @router.websocket("/{project_id}/simulate/live")

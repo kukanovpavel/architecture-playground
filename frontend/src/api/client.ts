@@ -1,4 +1,5 @@
 import type {
+  AdviceResult,
   Catalog,
   ComponentNode,
   Connection,
@@ -48,4 +49,9 @@ export const api = {
     request<void>(`/projects/${id}`, { method: "DELETE" }),
   simulate: (id: string) =>
     request<SimulationResult>(`/projects/${id}/simulate`, { method: "POST" }),
+  advise: (id: string, rate?: number) =>
+    request<AdviceResult>(
+      `/projects/${id}/advise${rate ? `?rate=${Math.round(rate)}` : ""}`,
+      { method: "POST" }
+    ),
 };

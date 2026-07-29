@@ -114,6 +114,35 @@ export interface LoadTotals {
   total_dropped: number;
 }
 
+// --- Recommendations ---
+
+export type Priority = "critical" | "high" | "medium" | "low";
+
+export interface Recommendation {
+  rule_id: string;
+  priority: Priority;
+  component_ids: string[];
+  connection_ids: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  details: Record<string, any>;
+}
+
+export interface AdviceSummary {
+  served_ratio: number;
+  dropped_rps: number;
+  max_utilization: number;
+  critical_path_latency_ms: number;
+  critical_count: number;
+  high_count: number;
+  healthy: boolean;
+}
+
+export interface AdviceResult {
+  arrival_rps: number;
+  summary: AdviceSummary;
+  recommendations: Recommendation[];
+}
+
 export interface LoadTick {
   type?: string;
   tick: number;

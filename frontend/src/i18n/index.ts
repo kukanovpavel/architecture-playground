@@ -2,7 +2,8 @@ import { useLanguageStore } from "./language";
 import { UI, type UIKey } from "./translations";
 import { CATALOG_I18N, CATEGORY_I18N } from "./catalogI18n";
 import { findingMessage } from "./findings";
-import type { Category, Finding } from "../types";
+import { recommendationText } from "./recommendations";
+import type { Category, Finding, Recommendation } from "../types";
 
 export { useLanguageStore } from "./language";
 export type { Language } from "./language";
@@ -27,4 +28,9 @@ export function useCatalogText() {
 export function useFindingMessage() {
   const language = useLanguageStore((s) => s.language);
   return (finding: Finding) => findingMessage(finding, language);
+}
+
+export function useRecommendationText() {
+  const language = useLanguageStore((s) => s.language);
+  return (recommendation: Recommendation) => recommendationText(recommendation, language);
 }
